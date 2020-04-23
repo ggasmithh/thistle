@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <pthread.h>
 
+// only using non-stdint.h types in this b/c its required in the spec lol
+
 typedef struct node {
     int data;
     struct node* next;
@@ -15,7 +17,8 @@ node_t* create_and_init_node() {
 }
 
 // releases lock on current node, acquires lock on next node, returns pointer to next node
-node_t* traverse(node_t* curr_node) {
+node_t* traverse(void* n) {
+    node_t* curr_node = (node_t*) n;
     if (curr_node != NULL && curr_node->next != NULL) {
         node_t* next_node = curr_node->next;
         
@@ -34,7 +37,9 @@ int get_node_data(node_t* target_node) {
 }
 
 // pushes a node with the given data to the end of the given linked list and updates its tail
-node_t* push(int new_data, node_t* last_node) {
+node_t* push(void* d, void* n) {
+    node_t* last_node = (node_t*) n;
+    int new_data = *(int*) d;
     node_t* tmp = create_and_init_node();
     tmp->data = new_data;
     tmp->next = NULL;
@@ -48,10 +53,11 @@ int main() {
     node_t* head = create_and_init_node();
 
     // Used for traversal purposes. Points to the node that the program is currently "looking at"
+    // Speeds up push() too
     node_t* current_node = head;
 
     for (int i = 0; i < 10; i++) {
-        current_node = push(i, current_node);
+        current_node = push(&i, current_node);
     }
 
     current_node = head;
