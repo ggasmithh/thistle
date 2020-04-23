@@ -10,7 +10,7 @@ typedef struct node {
 
 node_t* create_and_init_node() {
     node_t* n = (node_t*) calloc(1, sizeof(node_t));
-    //pthread_mutex_init(&n->lock, NULL);
+    pthread_mutex_init(&n->lock, NULL);
     return n;
 }
 
@@ -19,8 +19,8 @@ node_t* traverse(node_t* curr_node) {
     if (curr_node != NULL && curr_node->next != NULL) {
         node_t* next_node = curr_node->next;
         
-        //pthread_mutex_unlock(&curr_node->lock);
-        //pthread_mutex_lock(&next_node->lock);
+        pthread_mutex_unlock(&curr_node->lock);
+        pthread_mutex_lock(&next_node->lock);
         
         return next_node;
     } else {
