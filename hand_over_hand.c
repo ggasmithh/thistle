@@ -19,8 +19,8 @@ node_t* traverse(node_t* curr_node) {
     if (curr_node != NULL && curr_node->next != NULL) {
         node_t* next_node = curr_node->next;
         
-        pthread_mutex_unlock(&curr_node->lock);
         pthread_mutex_lock(&next_node->lock);
+        pthread_mutex_unlock(&curr_node->lock);
         
         return next_node;
     } else {
@@ -38,7 +38,9 @@ node_t* push(int new_data, node_t* last_node) {
     node_t* tmp = create_and_init_node();
     tmp->data = new_data;
     tmp->next = NULL;
+    pthread_mutex_lock(&last_node->lock);
     last_node->next = tmp;
+    pthread_mutex_unlock(&last_node->lock);
     return tmp;
 }
 
