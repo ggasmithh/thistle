@@ -54,7 +54,7 @@ int get_counter(counter_t* c) {
 }
 
 void decrement_counter(counter_t* c) {
-        pthread_mutex_lock(&c->lock);
+    pthread_mutex_lock(&c->lock);
     c->value--;
     pthread_mutex_unlock(&c->lock);
 }
@@ -93,20 +93,17 @@ node_t* push(void* n) {
     return tmp;
 }
 
-void insert_data(void* d, void *n) {
-    node_t* curr_node = (node_t*) n;
-    int new_data = *(int*) d;
-    pthread_mutex_lock(&curr_node->lock);
-    curr_node->data = new_data;
-    pthread_mutex_unlock(&curr_node->lock);
+void insert_data(int data, node_t* curr_node) {
+    curr_node->data = data;
 }
 
 void insert_loop(counter_t* counter, node_t* node, int limit) {
     int new_data;
+    node_t* curr_node = node;
     while(get_counter(counter) < limit) {
         new_data = (int) rand();
-        insert_data(&new_data, node);
-        node = traverse(node);
+        insert_data(new_data, curr_node);         
+        curr_node = traverse(curr_node);
         increment_counter(counter);
     }
 }
@@ -138,19 +135,18 @@ void test_one() {
     thread_args_t targs;
 
     // Used for traversal purposes. Points to the node that the program is currently "looking at"
-    // Speeds up push() too
     node_t* current_node = head;
 
-    targs.counter = counter;
-    targs.node = current_node;
-    targs.limit = LIMIT;
-
     // set up our empty list
-    for (int i = 0; i++; i < LIMIT) {
+    for (int i = 0; i < LIMIT; i++) {
         current_node = push(current_node);
     }
 
     current_node = head;
+
+    targs.counter = counter;
+    targs.node = current_node;
+    targs.limit = LIMIT;
 
     // start our second thread
     pthread_t insert_thread;
@@ -163,8 +159,6 @@ void test_one() {
         printf("oops");
         return 1;
     }
-
-    current_node = head;
 
     return 0;
 }
@@ -204,8 +198,6 @@ void test_two() {
         return 1;
     }
 
-    current_node = head;
-
     // we can risk printing the value directly here, as we should be done with 
     // both jobs
     printf("final insert counter: %d\n",  insert_targs.counter->value);
@@ -217,8 +209,8 @@ void test_two() {
 int main() {
     srand(time(NULL));
 
-    //test_one();
-    test_two();
+    test_one();
+    //test_two();
 
     return 0;
 }
