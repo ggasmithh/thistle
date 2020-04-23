@@ -8,6 +8,8 @@
 // a good deal of code is from OSTEP, specifically the following chapter:
 // http://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks-usage.pdf
 
+#define LIMIT (1000000)
+
 typedef struct node {
     int data;
     struct node* next;
@@ -77,12 +79,13 @@ int get_node_data(node_t* target_node) {
     return target_node->data;
 }
 
-// pushes a node with the given data to the end of the given linked list and updates its tail
-node_t* push(void* d, void* n) {
+// pushes a new node to be the "next" of a given node 
+// (intend use: given node = tail of linked list)
+// returns node that was pushed
+node_t* push(void* n) {
     node_t* last_node = (node_t*) n;
-    int new_data = *(int*) d;
     node_t* tmp = create_and_init_node();
-    tmp->data = new_data;
+    tmp->data = 0;
     tmp->next = NULL;
     pthread_mutex_lock(&last_node->lock);
     last_node->next = tmp;
@@ -90,16 +93,34 @@ node_t* push(void* d, void* n) {
     return tmp;
 }
 
+void insert_data(void* d, void *n) {
+    node_t* curr_node = (node_t*) n;
+    int new_data = *(int*) d;
+    pthread_mutex_lock(&curr_node->lock);
+    curr_node->data = new_data;
+    pthread_mutex_unlock(&curr_node->lock);
+}
+
 void insert_loop(counter_t* counter, node_t* node, int limit) {
     int new_data;
     while(get_counter(counter) < limit) {
         new_data = (int) rand();
-        node = push(&new_data, node);
+        insert_data(&new_data, node);
+        node = traverse(node);
         increment_counter(counter);
     }
 }
 
-void test_one_job(void* args) {
+void get_loop(counter_t* counter, node_t* node, int limit) {
+    node_t* curr_node = node;
+    while(get_counter(counter) < limit && curr_node != NULL) {
+        get_node_data(curr_node);
+        curr_node = traverse(curr_node);
+        increment_counter(counter);
+    }
+}
+
+void insert_job(void* args) {
     thread_args_t* targs = (thread_args_t*) args;
 
     counter_t* counter = targs->counter;
@@ -122,30 +143,73 @@ void test_one() {
 
     targs.counter = counter;
     targs.node = current_node;
-    targs.limit = 1000000;
+    targs.limit = LIMIT;
+
+    // set up our empty list
+    for (int i = 0; i++; i < LIMIT) {
+        current_node = push(current_node);
+    }
+
+    current_node = head;
 
     // start our second thread
-    pthread_t thread_two;
-    pthread_create(&thread_two, NULL, test_one_job, &targs);
+    pthread_t insert_thread;
+    pthread_create(&insert_thread, NULL, insert_job, &targs);
 
     // do the same thing on our first thread
     insert_loop(targs.counter, targs.node, targs.limit);
 
-    if (pthread_join(thread_two, NULL)) {
+    if (pthread_join(insert_thread, NULL)) {
         printf("oops");
         return 1;
     }
 
     current_node = head;
 
-    for (int i = 0; i < 10; i++) {
-        current_node = traverse(current_node);
-        if (current_node != NULL) {
-            printf("got number %d\n", get_node_data(current_node));
-        }
+    return 0;
+}
+
+// Test two: "Starting with an empty list, one thread inserts 1 million random 
+// integers, while another thread looks up 1 million random integers at the same time."
+void test_two() {
+    node_t* head = create_and_init_node();
+
+    counter_t* insert_counter = create_and_init_counter();
+    counter_t* get_counter = create_and_init_counter();
+
+    thread_args_t insert_targs;
+    thread_args_t get_targs;
+
+    // Used for traversal purposes. Points to the node that the program is currently "looking at"
+    // Speeds up push() too
+    node_t* current_node = head;
+
+    insert_targs.counter = insert_counter;
+    insert_targs.node = current_node;
+    insert_targs.limit = LIMIT;
+
+    get_targs.counter = get_counter;
+    get_targs.node = current_node;
+    get_targs.limit = LIMIT;
+
+    // start our second thread
+    pthread_t insert_thread;
+    pthread_create(&insert_thread, NULL, insert_job, &insert_targs);
+
+    // do the same thing on our first thread
+    get_loop(get_targs.counter, get_targs.node, get_targs.limit);
+
+    if (pthread_join(insert_thread, NULL)) {
+        printf("oops2");
+        return 1;
     }
-    
-    printf("final counter: %d\n",  get_counter(targs.counter));
+
+    current_node = head;
+
+    // we can risk printing the value directly here, as we should be done with 
+    // both jobs
+    printf("final insert counter: %d\n",  insert_targs.counter->value);
+    printf("final get counter: %d\n",  get_targs.counter->value);
 
     return 0;
 }
@@ -153,7 +217,8 @@ void test_one() {
 int main() {
     srand(time(NULL));
 
-    test_one();
+    //test_one();
+    test_two();
 
     return 0;
 }
