@@ -122,6 +122,16 @@ void insert_job(void* args) {
     insert_loop(counter, node, limit);
 }
 
+void get_job(void* args) {
+    thread_args_t* targs = (thread_args_t*) args;
+    
+    counter_t* counter = targs->counter;
+    node_t* node = targs->node;
+    int limit = targs->limit;
+
+    get_loop(counter, node, limit);
+}
+
 // Test one: "Starting with an empty list, two threads running at the same time insert 1 million random integers 
 // each on the same list."
 void test_one() {
@@ -203,11 +213,70 @@ void test_two() {
     return 0;
 }
 
+// Test three: "Starting with a list containing 1 million random integers, two threads running at the same time look up 1 million random integers each."
+void test_three() {
+
+    int num_get_threads = 2;
+
+    node_t* head = create_and_init_node();
+
+    counter_t* insert_counter = create_and_init_counter();
+    counter_t* get_counter = create_and_init_counter();
+
+    thread_args_t insert_targs;
+    thread_args_t get_targs[num_get_threads];
+    
+    pthread_t get_threads[num_get_threads];
+
+    // Used for traversal purposes. Points to the node that the program is currently "looking at"
+    node_t* current_node = head;
+
+
+    // set up our empty list
+    for (int i = 0; i < LIMIT; i++) {
+        current_node = push(current_node);
+    }
+
+    current_node = head;
+
+    insert_targs.counter = insert_counter;
+    insert_targs.node = current_node;
+    insert_targs.limit = LIMIT;
+    
+    // populate the list
+    insert_job(&insert_targs);
+
+    // set up the arguments to be passed to our "get" threads
+    for (int i = 0; i < num_get_threads; i++ ) {
+        get_targs[i].counter = get_counter;
+        get_targs[i].node = current_node;
+        get_targs[i].limit = LIMIT;
+    }
+
+    // start our threads
+    for (int i = 0; i < num_get_threads; i++) {
+        pthread_create(&get_threads[i], NULL, get_job, &get_targs[i]);
+    }
+
+    // join our threads once they are finished
+    for (int i = 0; i < num_get_threads; i++) {
+        pthread_join(get_threads[i], NULL);
+    }
+
+    // print our results
+    for (int i = 0; i < num_get_threads; i++) {
+        printf("Test 3 - final get%d counter: %d\n",  i + 1, get_targs[i].counter->value);
+    }
+
+    return 0;
+}
+
 int main() {
     srand(time(NULL));
 
     test_one();
     test_two();
+    test_three();
 
     return 0;
 }
