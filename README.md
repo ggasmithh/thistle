@@ -7,4 +7,4 @@ Two implementations of a **Th**read-**S**afe **L**inked List in C
     A linked list that utilizes a single lock for the entire list to ensure thread-safety.
 
 # why?
-school assignment
+school assignment, but its neat and i'm happy with my solution
