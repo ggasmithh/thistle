@@ -8,7 +8,8 @@
 // a good deal of code is from OSTEP, specifically the following chapter:
 // http://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks-usage.pdf
 
-#define LIMIT (1000000)
+//#define LIMIT (1000000)
+#define LIMIT (10)
 
 typedef struct node {
     int data;
@@ -69,8 +70,6 @@ node_t* traverse(void* n) {
         pthread_mutex_unlock(&curr_node->lock);
         
         return next_node;
-    } else {
-        return NULL;
     }
 }
 
@@ -175,8 +174,15 @@ void test_two() {
     thread_args_t get_targs;
 
     // Used for traversal purposes. Points to the node that the program is currently "looking at"
-    // Speeds up push() too
     node_t* current_node = head;
+
+    // set up our empty list
+    for (int i = 0; i < LIMIT; i++) {
+        current_node = push(current_node);
+    }
+
+    current_node = head;
+
 
     insert_targs.counter = insert_counter;
     insert_targs.node = current_node;
@@ -209,8 +215,8 @@ void test_two() {
 int main() {
     srand(time(NULL));
 
-    test_one();
-    //test_two();
+    //test_one();
+    test_two();
 
     return 0;
 }
