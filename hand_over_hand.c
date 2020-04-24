@@ -8,7 +8,8 @@
 // a good deal of code is from OSTEP, specifically the following chapter:
 // http://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks-usage.pdf
 
-#define LIMIT (1000000)
+//#define LIMIT (1000000)
+#define LIMIT (10)
 
 typedef struct node {
     int data;
@@ -17,8 +18,7 @@ typedef struct node {
 } node_t;
 
 typedef struct counter {
-    int value;
-    pthread_mutex_t lock;
+    int volatile value;
 } counter_t;
 
 typedef struct thread_args {
@@ -30,7 +30,6 @@ typedef struct thread_args {
 counter_t* create_and_init_counter() {
     counter_t* c = (counter_t*) calloc(1, sizeof(counter_t));
     c->value = 0;
-    pthread_mutex_init(&c->lock, NULL);
     return c;
 }
 
@@ -41,34 +40,30 @@ node_t* create_and_init_node() {
 }
 
 void increment_counter(counter_t* c) {
-    pthread_mutex_lock(&c->lock);
     c->value++;
-    pthread_mutex_unlock(&c->lock);
 }
 
 int get_counter(counter_t* c) {
-    pthread_mutex_lock(&c->lock);
     int value = c->value;
-    pthread_mutex_unlock(&c->lock);
     return value;
 }
 
 void decrement_counter(counter_t* c) {
-    pthread_mutex_lock(&c->lock);
     c->value--;
-    pthread_mutex_unlock(&c->lock);
 }
 
 // releases lock on current node, acquires lock on next node, returns pointer to next node
 node_t* traverse(void* n) {
-    node_t* curr_node = (node_t*) n;
-    if (curr_node != NULL && curr_node->next != NULL) {
-        node_t* next_node = curr_node->next;
-        
-        pthread_mutex_lock(&next_node->lock);
-        pthread_mutex_unlock(&curr_node->lock);
-        
-        return next_node;
+    if (n != NULL) {
+        node_t* curr_node = (node_t*) n;
+        if (curr_node->next != NULL) {
+            node_t* next_node = (node_t*) curr_node->next;
+            
+            //int lstatus = pthread_mutex_lock(&next_node->lock);
+            //int ulstatus = pthread_mutex_unlock(&curr_node->lock);
+            
+            return next_node;
+        }
     } else {
         return NULL;
     }
@@ -87,9 +82,9 @@ node_t* push(void* n) {
     node_t* tmp = create_and_init_node();
     tmp->data = 0;
     tmp->next = NULL;
-    pthread_mutex_lock(&last_node->lock);
+    //pthread_mutex_lock(&last_node->lock);
     last_node->next = tmp;
-    pthread_mutex_unlock(&last_node->lock);
+    //pthread_mutex_unlock(&last_node->lock);
     return tmp;
 }
 
@@ -100,7 +95,7 @@ void insert_data(int data, node_t* curr_node) {
 void insert_loop(counter_t* counter, node_t* node, int limit) {
     int new_data;
     node_t* curr_node = node;
-    while(get_counter(counter) < limit) {
+    while(get_counter(counter) < limit && curr_node != NULL) {
         new_data = (int) rand();
         insert_data(new_data, curr_node);         
         curr_node = traverse(curr_node);
@@ -110,7 +105,7 @@ void insert_loop(counter_t* counter, node_t* node, int limit) {
 
 void get_loop(counter_t* counter, node_t* node, int limit) {
     node_t* curr_node = node;
-    while(get_counter(counter) < limit && curr_node != NULL) {
+    while(get_counter(counter) < limit) {
         get_node_data(curr_node);
         curr_node = traverse(curr_node);
         increment_counter(counter);
@@ -155,10 +150,9 @@ void test_one() {
     // do the same thing on our first thread
     insert_loop(targs.counter, targs.node, targs.limit);
 
-    if (pthread_join(insert_thread, NULL)) {
-        printf("oops");
-        return 1;
-    }
+    pthread_join(insert_thread, NULL);
+
+    printf("Test 1 - final insert counter: %d", targs.counter->value);
 
     return 0;
 }
@@ -175,8 +169,14 @@ void test_two() {
     thread_args_t get_targs;
 
     // Used for traversal purposes. Points to the node that the program is currently "looking at"
-    // Speeds up push() too
     node_t* current_node = head;
+
+    // set up our empty list
+    for (int i = 0; i < LIMIT; i++) {
+        current_node = push(current_node);
+    }
+
+    current_node = head;
 
     insert_targs.counter = insert_counter;
     insert_targs.node = current_node;
@@ -193,15 +193,12 @@ void test_two() {
     // do the same thing on our first thread
     get_loop(get_targs.counter, get_targs.node, get_targs.limit);
 
-    if (pthread_join(insert_thread, NULL)) {
-        printf("oops2");
-        return 1;
-    }
+    pthread_join(insert_thread, NULL);
 
     // we can risk printing the value directly here, as we should be done with 
     // both jobs
-    printf("final insert counter: %d\n",  insert_targs.counter->value);
-    printf("final get counter: %d\n",  get_targs.counter->value);
+    printf("Test 2 - final insert counter: %d\n",  insert_targs.counter->value);
+    printf("Test 2 - final get counter: %d\n",  get_targs.counter->value);
 
     return 0;
 }
@@ -210,7 +207,7 @@ int main() {
     srand(time(NULL));
 
     test_one();
-    //test_two();
+    test_two();
 
     return 0;
 }
