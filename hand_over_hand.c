@@ -3,11 +3,6 @@
 #include <pthread.h>
 #include <time.h>
 
-// only using non-stdint.h types in this b/c its required in the spec lol
-
-// a good deal of code is from OSTEP, specifically the following chapter:
-// http://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks-usage.pdf
-
 //#define LIMIT (1000000)
 #define LIMIT (10)
 
@@ -27,6 +22,12 @@ typedef struct thread_args {
     int limit;
 } thread_args_t;
 
+
+// only using non-stdint.h types in this b/c its required in the spec lol
+
+// a good deal of code is from OSTEP, specifically the following chapter:
+// http://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks-usage.pdf
+
 counter_t* create_and_init_counter() {
     counter_t* c = (counter_t*) calloc(1, sizeof(counter_t));
     c->value = 0;
@@ -35,6 +36,7 @@ counter_t* create_and_init_counter() {
 
 node_t* create_and_init_node() {
     node_t* n = (node_t*) calloc(1, sizeof(node_t));
+    n->lock = 0;
     pthread_mutex_init(&n->lock, NULL);
     return n;
 }
@@ -44,8 +46,7 @@ void increment_counter(counter_t* c) {
 }
 
 int get_counter(counter_t* c) {
-    int value = c->value;
-    return value;
+    return c->value;
 }
 
 void decrement_counter(counter_t* c) {
@@ -58,10 +59,9 @@ node_t* traverse(void* n) {
         node_t* curr_node = (node_t*) n;
         if (curr_node->next != NULL) {
             node_t* next_node = (node_t*) curr_node->next;
-            
-            //int lstatus = pthread_mutex_lock(&next_node->lock);
-            //int ulstatus = pthread_mutex_unlock(&curr_node->lock);
-            
+            pthread_mutex_lock(&next_node->lock);
+            pthread_mutex_unlock(&curr_node->lock);
+
             return next_node;
         }
     } else {
@@ -82,9 +82,7 @@ node_t* push(void* n) {
     node_t* tmp = create_and_init_node();
     tmp->data = 0;
     tmp->next = NULL;
-    //pthread_mutex_lock(&last_node->lock);
     last_node->next = tmp;
-    //pthread_mutex_unlock(&last_node->lock);
     return tmp;
 }
 
