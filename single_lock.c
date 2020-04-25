@@ -101,12 +101,15 @@ void insert_loop(counter_t* counter, node_t* node, int limit, pthread_mutex_t* l
 }
 
 void lookup_loop(counter_t* counter, node_t* node, int limit, pthread_mutex_t* lock) {
+    int lookup_value;
     node_t* curr_node = node;
     while(get_counter(counter) < limit) {
+        lookup_value = (int) rand();
         pthread_mutex_lock(lock);
-        get_node_data(curr_node);
+        while (curr_node != NULL && get_node_data(curr_node) != lookup_value) {
+            curr_node = traverse(curr_node);
+        }
         pthread_mutex_unlock(lock);
-        curr_node = traverse(curr_node);
         increment_counter(counter);
     }
 }
