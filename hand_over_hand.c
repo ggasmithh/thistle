@@ -4,6 +4,8 @@ File:       hand_over_hand.c
 
 Sources used:
     1) https://github.com/angrave/SystemProgramming/wiki/Synchronization%2C-Part-1%3A-Mutex-Locks
+        a) page 8 - Concurrent Linked Lists
+        b) page 11 - Concurrent Queues
     2) manpages
     3) http://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks-usage.pdf
 

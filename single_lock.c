@@ -167,14 +167,63 @@ void test_one() {
 
     pthread_join(insert_thread, NULL);
 
-    printf("Test 1 - final insert counter: %d", targs.counter->value);
+    printf("Test 1 - final insert counter: %d\n", targs.counter->value);
+}
 
+// Test two: "Starting with an empty list, one thread inserts 1 million random 
+// integers, while another thread looks up 1 million random integers at the same time."
+void test_two() {
+    pthread_mutex_t lock;
+    node_t* head = create_and_init_node();
+
+    counter_t* insert_counter = create_and_init_counter();
+    counter_t* get_counter = create_and_init_counter();
+    
+    thread_args_t insert_targs;
+    thread_args_t get_targs;
+
+    pthread_mutex_init(&lock, NULL);
+
+    // Used for traversal purposes. Points to the node that the program is currently "looking at"
+    node_t* current_node = head;
+
+    // set up our empty list
+    for (int i = 0; i < LIMIT; i++) {
+        current_node = push(current_node);
+    }
+
+    current_node = head;
+
+    insert_targs.counter = insert_counter;
+    insert_targs.node = current_node;
+    insert_targs.limit = LIMIT;
+    insert_targs.lock = &lock;
+
+    get_targs.counter = get_counter;
+    get_targs.node = current_node;
+    get_targs.limit = LIMIT;
+    get_targs.lock = &lock;
+
+    // start our second thread
+    pthread_t insert_thread;
+    pthread_create(&insert_thread, NULL, insert_job, &insert_targs);
+
+    // do the same thing on our first thread
+    get_loop(get_targs.counter, get_targs.node, get_targs.limit, get_targs.lock);
+
+    pthread_join(insert_thread, NULL);
+
+    // we can risk printing the value directly here, as we should be done with 
+    // both jobs
+    printf("Test 2 - final insert counter: %d\n",  insert_targs.counter->value);
+    printf("Test 2 - final get counter: %d\n",  get_targs.counter->value);
 }
 
 int main() {
     srand(time(NULL));
 
     test_one();
+    test_two();
 
     return 0;
 }
