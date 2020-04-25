@@ -15,7 +15,9 @@ Sources used:
 #include <stdlib.h>
 #include <time.h>
 
-#define LIMIT (1000000)
+#define LIMIT (1000000) // maximum length of linked list
+#define WL3LUT                                                                 \
+  (2) // number of LookUp threads for workload 3 (this should never be changed)
 
 typedef struct node {
   int data;
@@ -23,13 +25,13 @@ typedef struct node {
 } node_t;
 
 typedef struct counter {
-  // we need the volatile keyword here because multiple threads will be 
-  // reading and writing to this value
+  // we need the volatile keyword here because multiple threads will be reading
+  // and writing to this value.
   int volatile value;
 } counter_t;
 
-// this acts as a nice little package that we can pass to pthread_create(), 
-// and it allows us to associate separate counters to individual threads
+// this acts as a nice little package that we can pass to pthread_create(), and
+// it allows us to associate separate counters to individual threads
 typedef struct thread_args {
   node_t *node;
   counter_t *counter;
@@ -38,7 +40,7 @@ typedef struct thread_args {
 } thread_args_t;
 
 counter_t *create_and_init_counter() {
-  // I just use calloc() here because I like it more than malloc()
+  // I just use calloc() here because I generally like it more than malloc()
   counter_t *c = (counter_t *)calloc(1, sizeof(counter_t));
   c->value = 0;
   return c;
@@ -66,9 +68,8 @@ node_t *traverse(void *n) {
   }
 }
 
-// pushes a new node to be the "next" of a given node
-// (intend use: given node = tail of linked list)
-// returns node that was pushed
+// pushes a new node to be the "next" of a given node (intend use: given node =
+// tail of linked list) returns node that was pushed
 node_t *push(void *n) {
   node_t *last_node = (node_t *)n;
   node_t *tmp = create_and_init_node();
@@ -76,41 +77,6 @@ node_t *push(void *n) {
   tmp->next = NULL;
   last_node->next = tmp;
   return tmp;
-}
-
-void insert_data(int data, node_t *curr_node) { curr_node->data = data; }
-
-int get_node_data(node_t *target_node) { return target_node->data; }
-
-// the loop that performs insertion of random data
-void insert_loop(counter_t *counter, node_t *node, int limit,
-                 pthread_mutex_t *lock) {
-  int new_data;
-  node_t *curr_node = node;
-  while (get_counter(counter) < limit && curr_node != NULL) {
-    new_data = (int)rand();
-    pthread_mutex_lock(lock);
-    insert_data(new_data, curr_node);
-    pthread_mutex_unlock(lock);
-    curr_node = traverse(curr_node);
-    increment_counter(counter);
-  }
-}
-
-// the loop that performs lookups of random data
-void lookup_loop(counter_t *counter, node_t *node, int limit,
-                 pthread_mutex_t *lock) {
-  int lookup_value;
-  node_t *curr_node = node;
-  while (get_counter(counter) < limit) {
-    lookup_value = (int)rand();
-    pthread_mutex_lock(lock);
-    while (curr_node != NULL && get_node_data(curr_node) != lookup_value) {
-      curr_node = traverse(curr_node);
-    }
-    pthread_mutex_unlock(lock);
-    increment_counter(counter);
-  }
 }
 
 // the wrapper for insert_loop, intended to be used with pthread_create()
@@ -122,7 +88,16 @@ void insert_job(void *args) {
   int limit = targs->limit;
   pthread_mutex_t *lock = targs->lock;
 
-  insert_loop(counter, node, limit, lock);
+  int new_data;
+  node_t *curr_node = node;
+  while (get_counter(counter) < limit && curr_node != NULL) {
+    new_data = (int)rand();
+    pthread_mutex_lock(lock);
+    curr_node->data = new_data;
+    pthread_mutex_unlock(lock);
+    curr_node = traverse(curr_node);
+    increment_counter(counter);
+  }
 }
 
 // the wrapper for lookup_loop, intended to be used with pthread_create()
@@ -134,15 +109,27 @@ void lookup_job(void *args) {
   int limit = targs->limit;
   pthread_mutex_t *lock = targs->lock;
 
-  lookup_loop(counter, node, limit, lock);
+  int lookup_value;
+  node_t *curr_node = node;
+  while (get_counter(counter) < limit) {
+    lookup_value = (int)rand();
+    pthread_mutex_lock(lock);
+    while (curr_node != NULL && curr_node->data != lookup_value) {
+      curr_node = traverse(curr_node);
+    }
+    pthread_mutex_unlock(lock);
+    increment_counter(counter);
+  }
 }
 
 // Test one: "Starting with an empty list, two threads running at the same time
 // insert 1 million random integers each on the same list."
 void test_one() {
+  clock_t start;
+  clock_t end;
+
   pthread_mutex_t lock;
   node_t *head = create_and_init_node();
-  counter_t *counter = create_and_init_counter();
   thread_args_t targs;
 
   pthread_mutex_init(&lock, NULL);
@@ -158,32 +145,36 @@ void test_one() {
 
   current_node = head;
 
-  targs.counter = counter;
+  targs.counter = create_and_init_counter();
   targs.node = current_node;
   targs.limit = LIMIT;
   targs.lock = &lock;
+
+  start = clock();
 
   // start our second thread
   pthread_t insert_thread;
   pthread_create(&insert_thread, NULL, insert_job, &targs);
 
   // do the same thing on our first thread
-  insert_loop(targs.counter, targs.node, targs.limit, targs.lock);
+  insert_job(&targs);
 
   pthread_join(insert_thread, NULL);
 
-  printf("Test 1 - final insert counter: %d\n", targs.counter->value);
+  end = clock();
+
+  printf("Workload 1 runtime: %.10e\n", (end - start) / (double)CLOCKS_PER_SEC);
 }
 
 // Test two: "Starting with an empty list, one thread inserts 1 million random
 // integers, while another thread looks up 1 million random integers at the same
 // time."
 void test_two() {
+  clock_t start;
+  clock_t end;
+
   pthread_mutex_t lock;
   node_t *head = create_and_init_node();
-
-  counter_t *insert_counter = create_and_init_counter();
-  counter_t *lookup_counter = create_and_init_counter();
 
   thread_args_t insert_targs;
   thread_args_t lookup_targs;
@@ -201,47 +192,45 @@ void test_two() {
 
   current_node = head;
 
-  insert_targs.counter = insert_counter;
+  insert_targs.counter = create_and_init_counter();
   insert_targs.node = current_node;
   insert_targs.limit = LIMIT;
   insert_targs.lock = &lock;
 
-  lookup_targs.counter = lookup_counter;
+  lookup_targs.counter = create_and_init_counter();
   lookup_targs.node = current_node;
   lookup_targs.limit = LIMIT;
   lookup_targs.lock = &lock;
+
+  start = clock();
 
   // start our second thread
   pthread_t insert_thread;
   pthread_create(&insert_thread, NULL, insert_job, &insert_targs);
 
   // do the same thing on our first thread
-  lookup_loop(lookup_targs.counter, lookup_targs.node, lookup_targs.limit,
-              lookup_targs.lock);
+  lookup_job(&lookup_targs);
 
   pthread_join(insert_thread, NULL);
 
-  printf("Test 2 - final insert counter: %d\n", insert_targs.counter->value);
-  printf("Test 2 - final lookup counter: %d\n", lookup_targs.counter->value);
+  end = clock();
+
+  printf("Workload 2 runtime: %.10e\n", (end - start) / (double)CLOCKS_PER_SEC);
 }
 
 // Test three: "Starting with a list containing 1 million random integers, two
 // threads running at the same time look up 1 million random integers each."
 void test_three() {
-  // I don't anticipate ever having a reason to change this, but I wanted to 
-  // stick this value in a variable so as to avoid "magic numbers"
-  int num_lookup_threads = 2;
+  clock_t start;
+  clock_t end;
 
   pthread_mutex_t lock;
   node_t *head = create_and_init_node();
 
-  counter_t *insert_counter = create_and_init_counter();
-  counter_t *lookup_counter = create_and_init_counter();
-
   thread_args_t insert_targs;
-  thread_args_t lookup_targs[num_lookup_threads];
+  thread_args_t lookup_targs[WL3LUT];
 
-  pthread_t lookup_threads[num_lookup_threads];
+  pthread_t lookup_thread;
 
   pthread_mutex_init(&lock, NULL);
 
@@ -256,7 +245,7 @@ void test_three() {
 
   current_node = head;
 
-  insert_targs.counter = insert_counter;
+  insert_targs.counter = create_and_init_counter();
   insert_targs.node = current_node;
   insert_targs.limit = LIMIT;
   insert_targs.lock = &lock;
@@ -265,28 +254,26 @@ void test_three() {
   insert_job(&insert_targs);
 
   // set up the arguments to be passed to our "lookup" threads
-  for (int i = 0; i < num_lookup_threads; i++) {
-    lookup_targs[i].counter = lookup_counter;
+  for (int i = 0; i < WL3LUT; i++) {
+    lookup_targs[i].counter = create_and_init_counter();
     lookup_targs[i].node = current_node;
     lookup_targs[i].limit = LIMIT;
     lookup_targs[i].lock = &lock;
   }
 
-  // start our threads
-  for (int i = 0; i < num_lookup_threads; i++) {
-    pthread_create(&lookup_threads[i], NULL, lookup_job, &lookup_targs[i]);
-  }
+  start = clock();
 
-  // join our threads once they are finished
-  for (int i = 0; i < num_lookup_threads; i++) {
-    pthread_join(lookup_threads[i], NULL);
-  }
+  // start second thread
+  pthread_create(&lookup_thread, NULL, lookup_job, &lookup_targs[WL3LUT]);
 
-  // print our results
-  for (int i = 0; i < num_lookup_threads; i++) {
-    printf("Test 3 - final lookup%d counter: %d\n", i,
-           lookup_targs[i].counter->value);
-  }
+  // do the same thing in our first thread
+  lookup_job(&lookup_targs[0]);
+
+  pthread_join(lookup_thread, NULL);
+
+  end = clock();
+
+  printf("Workload 3 runtime: %.10e\n", (end - start) / (double)CLOCKS_PER_SEC);
 }
 
 int main() {
