@@ -30,6 +30,7 @@ typedef struct thread_args {
     node_t* node;
     counter_t* counter;
     int limit;
+    pthread_mutex_t* lock;
 } thread_args_t;
 
 
@@ -86,21 +87,25 @@ int get_node_data(node_t* target_node) {
     return target_node->data;
 }
 
-void insert_loop(counter_t* counter, node_t* node, int limit) {
+void insert_loop(counter_t* counter, node_t* node, int limit, pthread_mutex_t* lock) {
     int new_data;
     node_t* curr_node = node;
     while(get_counter(counter) < limit && curr_node != NULL) {
         new_data = (int) rand();
+        pthread_mutex_lock(lock);
         insert_data(new_data, curr_node);         
+        pthread_mutex_unlock(lock);
         curr_node = traverse(curr_node);
         increment_counter(counter);
     }
 }
 
-void get_loop(counter_t* counter, node_t* node, int limit) {
+void get_loop(counter_t* counter, node_t* node, int limit, pthread_mutex_t* lock) {
     node_t* curr_node = node;
     while(get_counter(counter) < limit) {
+        pthread_mutex_lock(lock);
         get_node_data(curr_node);
+        pthread_mutex_unlock(lock);
         curr_node = traverse(curr_node);
         increment_counter(counter);
     }
@@ -112,8 +117,9 @@ void insert_job(void* args) {
     counter_t* counter = targs->counter;
     node_t* node = targs->node;
     int limit = targs->limit;
+    pthread_mutex_t* lock = targs->lock;
 
-    insert_loop(counter, node, limit);
+    insert_loop(counter, node, limit, lock);
 }
 
 void get_job(void* args) {
@@ -122,8 +128,9 @@ void get_job(void* args) {
     counter_t* counter = targs->counter;
     node_t* node = targs->node;
     int limit = targs->limit;
+    pthread_mutex_t* lock = targs->lock;
 
-    get_loop(counter, node, limit);
+    get_loop(counter, node, limit, lock);
 }
 
 // Test one: "Starting with an empty list, two threads running at the same time insert 1 million random integers 
@@ -149,13 +156,14 @@ void test_one() {
     targs.counter = counter;
     targs.node = current_node;
     targs.limit = LIMIT;
+    targs.lock = &lock;
 
     // start our second thread
     pthread_t insert_thread;
     pthread_create(&insert_thread, NULL, insert_job, &targs);
 
     // do the same thing on our first thread
-    insert_loop(targs.counter, targs.node, targs.limit);
+    insert_loop(targs.counter, targs.node, targs.limit, targs.lock);
 
     pthread_join(insert_thread, NULL);
 
