@@ -109,17 +109,18 @@ void insert_loop(counter_t* counter, node_t* node, int limit) {
         curr_node = traverse(curr_node);
         increment_counter(counter);
     }
-    pthread_mutex_unlock(&curr_node->lock);
 }
 
 void lookup_loop(counter_t* counter, node_t* node, int limit) {
+    int lookup_value;
     node_t* curr_node = node;
     while(get_counter(counter) < limit) {
-        get_node_data(curr_node);
-        curr_node = traverse(curr_node);
+        lookup_value = (int) rand();
+        while (curr_node != NULL && get_node_data(curr_node) != lookup_value) {
+            curr_node = traverse(curr_node);
+        }
         increment_counter(counter);
     }
-    pthread_mutex_unlock(&curr_node->lock);
 }
 
 void insert_job(void* args) {
@@ -172,7 +173,7 @@ void test_one() {
 
     pthread_join(insert_thread, NULL);
 
-    printf("Test 1 - final insert counter: %d", targs.counter->value);
+    printf("Test 1 - final insert counter: %d\n", targs.counter->value);
 }
 
 // Test two: "Starting with an empty list, one thread inserts 1 million random 
