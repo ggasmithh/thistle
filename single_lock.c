@@ -100,13 +100,16 @@ void insert_loop(counter_t* counter, node_t* node, int limit, pthread_mutex_t* l
     }
 }
 
-void get_loop(counter_t* counter, node_t* node, int limit, pthread_mutex_t* lock) {
+void lookup_loop(counter_t* counter, node_t* node, int limit, pthread_mutex_t* lock) {
+    int lookup_value;
     node_t* curr_node = node;
     while(get_counter(counter) < limit) {
+        lookup_value = (int) rand();
         pthread_mutex_lock(lock);
-        get_node_data(curr_node);
+        while (curr_node != NULL && get_node_data(curr_node) != lookup_value) {
+            curr_node = traverse(curr_node);
+        }
         pthread_mutex_unlock(lock);
-        curr_node = traverse(curr_node);
         increment_counter(counter);
     }
 }
@@ -122,7 +125,7 @@ void insert_job(void* args) {
     insert_loop(counter, node, limit, lock);
 }
 
-void get_job(void* args) {
+void lookup_job(void* args) {
     thread_args_t* targs = (thread_args_t*) args;
     
     counter_t* counter = targs->counter;
@@ -130,7 +133,7 @@ void get_job(void* args) {
     int limit = targs->limit;
     pthread_mutex_t* lock = targs->lock;
 
-    get_loop(counter, node, limit, lock);
+    lookup_loop(counter, node, limit, lock);
 }
 
 // Test one: "Starting with an empty list, two threads running at the same time insert 1 million random integers 
@@ -177,10 +180,10 @@ void test_two() {
     node_t* head = create_and_init_node();
 
     counter_t* insert_counter = create_and_init_counter();
-    counter_t* get_counter = create_and_init_counter();
+    counter_t* lookup_counter = create_and_init_counter();
     
     thread_args_t insert_targs;
-    thread_args_t get_targs;
+    thread_args_t lookup_targs;
 
     pthread_mutex_init(&lock, NULL);
 
@@ -199,40 +202,40 @@ void test_two() {
     insert_targs.limit = LIMIT;
     insert_targs.lock = &lock;
 
-    get_targs.counter = get_counter;
-    get_targs.node = current_node;
-    get_targs.limit = LIMIT;
-    get_targs.lock = &lock;
+    lookup_targs.counter = lookup_counter;
+    lookup_targs.node = current_node;
+    lookup_targs.limit = LIMIT;
+    lookup_targs.lock = &lock;
 
     // start our second thread
     pthread_t insert_thread;
     pthread_create(&insert_thread, NULL, insert_job, &insert_targs);
 
     // do the same thing on our first thread
-    get_loop(get_targs.counter, get_targs.node, get_targs.limit, get_targs.lock);
+    lookup_loop(lookup_targs.counter, lookup_targs.node, lookup_targs.limit, lookup_targs.lock);
 
     pthread_join(insert_thread, NULL);
 
     // we can risk printing the value directly here, as we should be done with 
     // both jobs
     printf("Test 2 - final insert counter: %d\n",  insert_targs.counter->value);
-    printf("Test 2 - final get counter: %d\n",  get_targs.counter->value);
+    printf("Test 2 - final lookup counter: %d\n",  lookup_targs.counter->value);
 }
 
 // Test three: "Starting with a list containing 1 million random integers, two threads running at the same time look up 1 million random integers each."
 void test_three() {
-    int num_get_threads = 2;
+    int num_lookup_threads = 2;
 
     pthread_mutex_t lock;
     node_t* head = create_and_init_node();
 
     counter_t* insert_counter = create_and_init_counter();
-    counter_t* get_counter = create_and_init_counter();
+    counter_t* lookup_counter = create_and_init_counter();
 
     thread_args_t insert_targs;
-    thread_args_t get_targs[num_get_threads];
+    thread_args_t lookup_targs[num_lookup_threads];
     
-    pthread_t get_threads[num_get_threads];
+    pthread_t lookup_threads[num_lookup_threads];
 
     pthread_mutex_init(&lock, NULL);
 
@@ -254,27 +257,27 @@ void test_three() {
     // populate the list
     insert_job(&insert_targs);
 
-    // set up the arguments to be passed to our "get" threads
-    for (int i = 0; i < num_get_threads; i++ ) {
-        get_targs[i].counter = get_counter;
-        get_targs[i].node = current_node;
-        get_targs[i].limit = LIMIT;
-        get_targs[i].lock = &lock;
+    // set up the arguments to be passed to our "lookup" threads
+    for (int i = 0; i < num_lookup_threads; i++ ) {
+        lookup_targs[i].counter = lookup_counter;
+        lookup_targs[i].node = current_node;
+        lookup_targs[i].limit = LIMIT;
+        lookup_targs[i].lock = &lock;
     }
 
     // start our threads
-    for (int i = 0; i < num_get_threads; i++) {
-        pthread_create(&get_threads[i], NULL, get_job, &get_targs[i]);
+    for (int i = 0; i < num_lookup_threads; i++) {
+        pthread_create(&lookup_threads[i], NULL, lookup_job, &lookup_targs[i]);
     }
 
     // join our threads once they are finished
-    for (int i = 0; i < num_get_threads; i++) {
-        pthread_join(get_threads[i], NULL);
+    for (int i = 0; i < num_lookup_threads; i++) {
+        pthread_join(lookup_threads[i], NULL);
     }
 
     // print our results
-    for (int i = 0; i < num_get_threads; i++) {
-        printf("Test 3 - final get%d counter: %d\n",  i + 1, get_targs[i].counter->value);
+    for (int i = 0; i < num_lookup_threads; i++) {
+        printf("Test 3 - final lookup%d counter: %d\n",  i + 1, lookup_targs[i].counter->value);
     }
 }
 
