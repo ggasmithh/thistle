@@ -18,8 +18,8 @@ https://github.com/angrave/SystemProgramming/wiki/Synchronization%2C-Part-1%3A-M
 #include <time.h>
 
 #define LIMIT (1000000) // maximum length of linked list
-#define WL3LUT                                                                 \
-  (2) // number of LookUp threads for workload 3 (this should never be changed)
+#define WL3LUT (2) // number of LookUp threads for workload 3 (this should never
+                   // be changed)
 
 typedef struct node {
   int data;
