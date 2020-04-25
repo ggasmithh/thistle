@@ -284,7 +284,7 @@ void test_three() {
 
   // print our results
   for (int i = 0; i < num_lookup_threads; i++) {
-    printf("Test 3 - final lookup%d counter: %d\n", i + 1,
+    printf("Test 3 - final lookup%d counter: %d\n", i,
            lookup_targs[i].counter->value);
   }
 }
