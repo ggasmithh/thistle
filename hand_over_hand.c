@@ -1,3 +1,16 @@
+/* 
+Author:     Garrett Smith
+File:       hand_over_hand.c
+
+Sources used:
+    1) https://github.com/angrave/SystemProgramming/wiki/Synchronization%2C-Part-1%3A-Mutex-Locks
+    2) manpages
+    3) http://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks-usage.pdf
+
+*/
+
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -9,7 +22,7 @@
 typedef struct node {
     int data;
     struct node* next;
-    pthread_mutex_t lock;
+    pthread_mutex_t* lock;
 } node_t;
 
 typedef struct counter {
@@ -22,12 +35,6 @@ typedef struct thread_args {
     int limit;
 } thread_args_t;
 
-
-// only using non-stdint.h types in this b/c its required in the spec lol
-
-// a good deal of code is from OSTEP, specifically the following chapter:
-// http://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks-usage.pdf
-
 counter_t* create_and_init_counter() {
     counter_t* c = (counter_t*) calloc(1, sizeof(counter_t));
     c->value = 0;
@@ -36,8 +43,8 @@ counter_t* create_and_init_counter() {
 
 node_t* create_and_init_node() {
     node_t* n = (node_t*) calloc(1, sizeof(node_t));
-    n->lock = 0;
-    pthread_mutex_init(&n->lock, NULL);
+    n->lock = malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init(n->lock, NULL);
     return n;
 }
 
@@ -59,6 +66,7 @@ node_t* traverse(void* n) {
         node_t* curr_node = (node_t*) n;
         if (curr_node->next != NULL) {
             node_t* next_node = (node_t*) curr_node->next;
+
             pthread_mutex_lock(&next_node->lock);
             pthread_mutex_unlock(&curr_node->lock);
 
@@ -99,6 +107,7 @@ void insert_loop(counter_t* counter, node_t* node, int limit) {
         curr_node = traverse(curr_node);
         increment_counter(counter);
     }
+    pthread_mutex_unlock(&curr_node->lock);
 }
 
 void get_loop(counter_t* counter, node_t* node, int limit) {
@@ -108,6 +117,7 @@ void get_loop(counter_t* counter, node_t* node, int limit) {
         curr_node = traverse(curr_node);
         increment_counter(counter);
     }
+    pthread_mutex_unlock(&curr_node->lock);
 }
 
 void insert_job(void* args) {
