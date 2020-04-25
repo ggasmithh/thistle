@@ -23,9 +23,13 @@ typedef struct node {
 } node_t;
 
 typedef struct counter {
+  // we need the volatile keyword here because multiple threads will be 
+  // reading and writing to this value
   int volatile value;
 } counter_t;
 
+// this acts as a nice little package that we can pass to pthread_create(), 
+// and it allows us to associate separate counters to individual threads
 typedef struct thread_args {
   node_t *node;
   counter_t *counter;
@@ -34,6 +38,7 @@ typedef struct thread_args {
 } thread_args_t;
 
 counter_t *create_and_init_counter() {
+  // I just use calloc() here because I like it more than malloc()
   counter_t *c = (counter_t *)calloc(1, sizeof(counter_t));
   c->value = 0;
   return c;
@@ -75,9 +80,9 @@ node_t *push(void *n) {
 
 void insert_data(int data, node_t *curr_node) { curr_node->data = data; }
 
-// returns the data for a node at a given address
 int get_node_data(node_t *target_node) { return target_node->data; }
 
+// the loop that performs insertion of random data
 void insert_loop(counter_t *counter, node_t *node, int limit,
                  pthread_mutex_t *lock) {
   int new_data;
@@ -92,6 +97,7 @@ void insert_loop(counter_t *counter, node_t *node, int limit,
   }
 }
 
+// the loop that performs lookups of random data
 void lookup_loop(counter_t *counter, node_t *node, int limit,
                  pthread_mutex_t *lock) {
   int lookup_value;
@@ -107,6 +113,7 @@ void lookup_loop(counter_t *counter, node_t *node, int limit,
   }
 }
 
+// the wrapper for insert_loop, intended to be used with pthread_create()
 void insert_job(void *args) {
   thread_args_t *targs = (thread_args_t *)args;
 
@@ -118,6 +125,7 @@ void insert_job(void *args) {
   insert_loop(counter, node, limit, lock);
 }
 
+// the wrapper for lookup_loop, intended to be used with pthread_create()
 void lookup_job(void *args) {
   thread_args_t *targs = (thread_args_t *)args;
 
@@ -213,8 +221,6 @@ void test_two() {
 
   pthread_join(insert_thread, NULL);
 
-  // we can risk printing the value directly here, as we should be done with
-  // both jobs
   printf("Test 2 - final insert counter: %d\n", insert_targs.counter->value);
   printf("Test 2 - final lookup counter: %d\n", lookup_targs.counter->value);
 }
@@ -222,6 +228,8 @@ void test_two() {
 // Test three: "Starting with a list containing 1 million random integers, two
 // threads running at the same time look up 1 million random integers each."
 void test_three() {
+  // I don't anticipate ever having a reason to change this, but I wanted to 
+  // stick this value in a variable so as to avoid "magic numbers"
   int num_lookup_threads = 2;
 
   pthread_mutex_t lock;
