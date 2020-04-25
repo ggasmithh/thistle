@@ -17,8 +17,7 @@ https://github.com/angrave/SystemProgramming/wiki/Synchronization%2C-Part-1%3A-M
 #include <stdlib.h>
 #include <time.h>
 
-//#define LIMIT (1000000)
-#define LIMIT (10)
+#define LIMIT (1000000)
 
 typedef struct node {
   int data;
