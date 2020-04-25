@@ -171,8 +171,6 @@ void test_one() {
     pthread_join(insert_thread, NULL);
 
     printf("Test 1 - final insert counter: %d", targs.counter->value);
-
-    return 0;
 }
 
 // Test two: "Starting with an empty list, one thread inserts 1 million random 
@@ -217,8 +215,6 @@ void test_two() {
     // both jobs
     printf("Test 2 - final insert counter: %d\n",  insert_targs.counter->value);
     printf("Test 2 - final get counter: %d\n",  get_targs.counter->value);
-
-    return 0;
 }
 
 // Test three: "Starting with a list containing 1 million random integers, two threads running at the same time look up 1 million random integers each."
@@ -275,8 +271,6 @@ void test_three() {
     for (int i = 0; i < num_get_threads; i++) {
         printf("Test 3 - final get%d counter: %d\n",  i + 1, get_targs[i].counter->value);
     }
-
-    return 0;
 }
 
 int main() {
