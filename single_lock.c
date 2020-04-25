@@ -7,6 +7,7 @@ Sources used:
         a) page 8 - Concurrent Linked Lists
     2) manpages
     3) ./hand_over_hand.c
+    4) https://stackoverflow.com/questions/11253025/pthread-create-not-working-passing-argument-3-warning
 
 */
 
@@ -80,7 +81,7 @@ node_t *push(void *n) {
 }
 
 // the wrapper for insert_loop, intended to be used with pthread_create()
-void insert_job(void *args) {
+void *insert_job(void *args) {
   thread_args_t *targs = (thread_args_t *)args;
 
   counter_t *counter = targs->counter;
@@ -101,7 +102,7 @@ void insert_job(void *args) {
 }
 
 // the wrapper for lookup_loop, intended to be used with pthread_create()
-void lookup_job(void *args) {
+void *lookup_job(void *args) {
   thread_args_t *targs = (thread_args_t *)args;
 
   counter_t *counter = targs->counter;
