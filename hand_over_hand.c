@@ -18,7 +18,7 @@ https://github.com/angrave/SystemProgramming/wiki/Synchronization%2C-Part-1%3A-M
 #include <stdlib.h>
 #include <time.h>
 
-#define LIMIT (1000000) // maximum length of linked list
+#define LIMIT (10000000) // maximum length of linked list
 #define WL3LUT (2) // number of LookUp threads for workload 3 (this should never
                    // be changed)
 
@@ -164,7 +164,7 @@ void test_one() {
 
   end = clock();
 
-  printf("Workload 1 runtime: %.10e\n", (end - start) / (double)CLOCKS_PER_SEC);
+  printf("Workload 1 runtime: %.6f\n", (end - start) / (float)CLOCKS_PER_SEC);
 }
 
 // Test two: "Starting with an empty list, one thread inserts 1 million random
@@ -211,7 +211,7 @@ void test_two() {
 
   end = clock();
 
-  printf("Workload 2 runtime: %.10e\n", (end - start) / (double)CLOCKS_PER_SEC);
+  printf("Workload 2 runtime: %.6f\n", (end - start) / (float)CLOCKS_PER_SEC);
 }
 
 // Test three: "Starting with a list containing 1 million random integers, two
@@ -264,7 +264,7 @@ void test_three() {
 
   end = clock();
 
-  printf("Workload 3 runtime: %.10e\n", (end - start) / (double)CLOCKS_PER_SEC);
+  printf("Workload 3 runtime: %.6f\n", (end - start) / (float)CLOCKS_PER_SEC);
 }
 
 int main() {
